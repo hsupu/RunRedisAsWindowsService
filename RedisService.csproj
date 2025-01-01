@@ -1,0 +1,25 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+	<PropertyGroup>
+		<TargetFramework>net8.0-windows</TargetFramework>
+    	<PlatformTarget>x64</PlatformTarget>
+		<OutputType>exe</OutputType>
+    	<!-- <RootNamespace>RedisService</RootNamespace> -->
+		<DebugType>embedded</DebugType>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>true</ImplicitUsings>
+		<InvariantGlobalization>true</InvariantGlobalization>
+		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    	<PublishSingleFile Condition="'$(Configuration)' == 'Release'">true</PublishSingleFile>
+		<SelfContained Condition="'$(Configuration)' == 'Release'">true</SelfContained>
+		<PublishReadyToRun>false</PublishReadyToRun>
+		<PublishTrimmed Condition="'$(Configuration)' == 'Release'">true</PublishTrimmed>
+	</PropertyGroup>
+
+	<ItemGroup>
+  		<PackageReference Include="CommandLineParser" Version="2.9.1" />
+  		<PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="8.0.0" />
+	</ItemGroup>
+
+</Project>
