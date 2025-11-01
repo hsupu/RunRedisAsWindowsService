@@ -22,42 +22,78 @@ class Program
         public string WorkingDirectory { get; set; } = ".";
 
         [Option('c', "config", Required = false, HelpText = "Path to redis-server.conf")]
-        public string ConfigFilePath { get; set; } = "redis-server.conf";
+        public string ConfigFilePath { get; set; } = string.Empty;
     }
 
     [DynamicDependency(DynamicallyAccessedMemberTypes.All, typeof(Options))]
     static void Main(string[] args)
     {
-        Parser.Default.ParseArguments<Options>(args).WithParsed(MainImpl);
+        var parser = new Parser(settings =>
+        {
+            // Enable -- to separate known and unknown args.
+            settings.EnableDashDash = true;
+            // Ignores unknown arguments so we can forward them.
+            // settings.IgnoreUnknownArguments = true;
+        });
+
+        var parseResult = parser.ParseArguments<Options>(args);
+        parseResult.WithParsed(options => MainImpl(options, args));
     }
 
-    static void MainImpl(Options options)
+    static void MainImpl(Options options, string[] originalArgs)
     {
         string workDir = Path.GetFullPath(options.WorkingDirectory);
 
-        string configFileCygwinPath = options.ConfigFilePath;
-
-        if (configFileCygwinPath.StartsWith("/cygdrive/"))
+        string? configFileCygwinPath = null;
+        if (!string.IsNullOrWhiteSpace(options.ConfigFilePath))
         {
-            // nop
-        }
-        else
-        {
-            if (!Path.IsPathRooted(configFileCygwinPath))
+            configFileCygwinPath = options.ConfigFilePath;
+            if (configFileCygwinPath.StartsWith("/cygdrive/"))
             {
-                // AppContext.BaseDirectory
-                configFileCygwinPath = Path.Combine(workDir, configFileCygwinPath);
-                configFileCygwinPath = Path.GetFullPath(configFileCygwinPath);
+                // already cygwin style
             }
-
-            var diskLetter = configFileCygwinPath[..configFileCygwinPath.IndexOf(":")];
-            configFileCygwinPath = configFileCygwinPath.Replace(diskLetter + ":", "/cygdrive/" + diskLetter).Replace("\\", "/");
+            else
+            {
+                if (!Path.IsPathRooted(configFileCygwinPath))
+                {
+                    // AppContext.BaseDirectory is the exe directory not the working directory
+                    configFileCygwinPath = Path.Combine(workDir, configFileCygwinPath);
+                    configFileCygwinPath = Path.GetFullPath(configFileCygwinPath);
+                }
+                var diskLetter = configFileCygwinPath[..configFileCygwinPath.IndexOf(":")];
+                configFileCygwinPath = configFileCygwinPath.Replace(diskLetter + ":", "/cygdrive/" + diskLetter).Replace("\\", "/");
+            }
         }
+
+        // Only support forwarding arguments that appear after a standalone "--" separator.
+        var extraArgs = new List<string>();
+        bool foundSeparator = false;
+        foreach (var token in originalArgs)
+        {
+            if (!foundSeparator)
+            {
+                if (token == "--")
+                {
+                    foundSeparator = true;
+                }
+                continue;
+            }
+            extraArgs.Add(token);
+        }
+
+        // Build final argument list for redis-server.
+        // Usage: redis-server [/path/to/redis.conf] [options] [-]
+        var forwardedArgs = new List<string>();
+        if (configFileCygwinPath is not null)
+        {
+            forwardedArgs.Add(configFileCygwinPath);
+        }
+        forwardedArgs.AddRange(extraArgs);
 
         IHost host = Host.CreateDefaultBuilder()
             .ConfigureServices(services =>
             {
-                services.AddHostedService(serviceProvider => new RedisService(options.ExePath, workDir, configFileCygwinPath));
+                services.AddHostedService(serviceProvider => new RedisService(options.ExePath, workDir, forwardedArgs));
             })
             .UseWindowsService(options =>
             {
@@ -71,15 +107,14 @@ class Program
 }
 
 
-public class RedisService(string exePath, string workDir, string configFileCygwinPath) : BackgroundService
+public class RedisService(string exePath, string workDir, IEnumerable<string> forwardedArgs) : BackgroundService
 {
 
     private Process? process = new();
 
     public override Task StartAsync(CancellationToken stoppingToken)
     {
-        // Usage: [/path/to/redis.conf] [options] [-]
-        ProcessStartInfo processStartInfo = new(exePath, new []{ configFileCygwinPath })
+        ProcessStartInfo processStartInfo = new(exePath, forwardedArgs)
         {
             WorkingDirectory = workDir,
         };
