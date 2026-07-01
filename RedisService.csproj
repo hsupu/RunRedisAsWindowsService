@@ -31,6 +31,10 @@
 		<PackageReference Include="CommandLineParser" Version="2.9.1" />
 	</ItemGroup>
 
+	<ItemGroup>
+		<InternalsVisibleTo Include="RedisService.Tests" />
+	</ItemGroup>
+
 	<!-- The project lives at the repo root, so keep the test project's sources
 	     out of this compilation. -->
 	<ItemGroup>

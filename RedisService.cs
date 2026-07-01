@@ -23,6 +23,21 @@ public sealed class RedisService : BackgroundService
 
     private volatile Process? _process;
 
+    /// <summary>The child process, exposed for tests only. Null before start / after stop.</summary>
+    internal Process? ChildProcess => _process;
+
+    /// <summary>How long to wait for a graceful (Ctrl-C) shutdown before killing the process tree. Exposed for tests.</summary>
+    internal TimeSpan GracefulStopTimeout { get; set; } = TimeSpan.FromSeconds(10);
+
+    /// <summary>Whether the most recent stop completed gracefully (the child honored Ctrl-C). Exposed for tests.</summary>
+    internal bool LastStopWasGraceful { get; private set; }
+
+    /// <summary>
+    /// How a graceful stop is requested from the child (returns false when unavailable). Defaults to a Windows console Ctrl-C.
+    /// This is a seam: firing a real console event inside a test host would kill the test host, so tests substitute a fake and the real path is verified out-of-process.
+    /// </summary>
+    internal Func<int, bool> SendGracefulStopSignal { get; set; }
+
     public RedisService(string exePath, string workDir, IReadOnlyList<string> forwardedArgs, ILogger<RedisService> logger, IHostApplicationLifetime lifetime)
     {
         _exePath = exePath;
@@ -30,6 +45,7 @@ public sealed class RedisService : BackgroundService
         _forwardedArgs = forwardedArgs;
         _logger = logger;
         _lifetime = lifetime;
+        SendGracefulStopSignal = pid => NativeConsole.TrySendCtrlC(pid, _logger);
     }
 
     public override Task StartAsync(CancellationToken cancellationToken)
@@ -97,9 +113,18 @@ public sealed class RedisService : BackgroundService
             {
                 if (!process.HasExited)
                 {
-                    _logger.LogInformation("Stopping redis-server (pid {Pid}).", process.Id);
-                    process.Kill(entireProcessTree: true);
-                    await process.WaitForExitAsync(cancellationToken);
+                    LastStopWasGraceful = await TryGracefulStopAsync(process, cancellationToken);
+
+                    if (LastStopWasGraceful)
+                    {
+                        _logger.LogInformation("redis-server stopped gracefully.");
+                    }
+                    else if (!process.HasExited)
+                    {
+                        _logger.LogInformation("Graceful stop did not complete; killing the process tree (pid {Pid}).", process.Id);
+                        process.Kill(entireProcessTree: true);
+                        await process.WaitForExitAsync(CancellationToken.None);
+                    }
                 }
             }
             catch (Exception ex)
@@ -116,6 +141,28 @@ public sealed class RedisService : BackgroundService
 
         // Use None so the final host cleanup is not itself cancelled by an expired SCM stop token.
         await base.StopAsync(CancellationToken.None);
+    }
+
+    private async Task<bool> TryGracefulStopAsync(Process process, CancellationToken cancellationToken)
+    {
+        // Ask redis to shut down the way it would on SIGINT: a console Ctrl-C. It persists and exits on its own.
+        if (!SendGracefulStopSignal(process.Id))
+        {
+            return false;
+        }
+
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(GracefulStopTimeout);
+
+        try
+        {
+            await process.WaitForExitAsync(timeout.Token);
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
+        }
     }
 
     private int TryGetExitCode()
