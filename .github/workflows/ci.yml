@@ -1,0 +1,80 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  build-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Restore
+        run: dotnet restore RunRedisAsWindowsService.sln
+
+      - name: Build
+        run: dotnet build RunRedisAsWindowsService.sln -c Release --no-restore
+
+      - name: Test
+        run: dotnet test tests/RedisService.Tests/RedisService.Tests.csproj -c Release --no-build
+
+  publish:
+    needs: build-test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        framework: [net8.0-windows, net10.0-windows]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Derive version from tag
+        id: version
+        shell: bash
+        run: echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish single-file self-contained exe
+        run: >
+          dotnet publish RedisService.csproj
+          -c Release
+          -r win-x64
+          -f ${{ matrix.framework }}
+          -p:Version=${{ steps.version.outputs.value }}
+
+      - name: Stage artifact
+        shell: bash
+        run: |
+          out="bin/Release/${{ matrix.framework }}/win-x64/publish/RedisService.exe"
+          cp "$out" "RedisService-${{ matrix.framework }}-win-x64.exe"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RedisService-${{ matrix.framework }}-win-x64
+          path: RedisService-${{ matrix.framework }}-win-x64.exe
+
+      - name: Attach to GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: RedisService-${{ matrix.framework }}-win-x64.exe

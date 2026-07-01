@@ -1,25 +1,42 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Worker">
+<Project Sdk="Microsoft.NET.Sdk.Worker">
 
 	<PropertyGroup>
-		<TargetFramework>net8.0-windows</TargetFramework>
-    	<PlatformTarget>x64</PlatformTarget>
+		<TargetFrameworks>net8.0-windows;net10.0-windows</TargetFrameworks>
+		<PlatformTarget>x64</PlatformTarget>
 		<OutputType>exe</OutputType>
-    	<!-- <RootNamespace>RedisService</RootNamespace> -->
+		<!-- <RootNamespace>RedisService</RootNamespace> -->
 		<DebugType>embedded</DebugType>
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>true</ImplicitUsings>
 		<InvariantGlobalization>true</InvariantGlobalization>
 		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    	<PublishSingleFile Condition="'$(Configuration)' == 'Release'">true</PublishSingleFile>
+		<PublishSingleFile Condition="'$(Configuration)' == 'Release'">true</PublishSingleFile>
 		<SelfContained Condition="'$(Configuration)' == 'Release'">true</SelfContained>
 		<PublishReadyToRun>false</PublishReadyToRun>
 		<PublishTrimmed Condition="'$(Configuration)' == 'Release'">true</PublishTrimmed>
 	</PropertyGroup>
 
+	<!-- Keep the framework packages aligned with each target runtime. -->
+	<ItemGroup Condition="'$(TargetFramework)' == 'net8.0-windows'">
+		<PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+		<PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="8.0.1" />
+	</ItemGroup>
+
+	<ItemGroup Condition="'$(TargetFramework)' == 'net10.0-windows'">
+		<PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.0" />
+	</ItemGroup>
+
 	<ItemGroup>
-  		<PackageReference Include="CommandLineParser" Version="2.9.1" />
-  		<PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
-		<PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="8.0.0" />
+		<PackageReference Include="CommandLineParser" Version="2.9.1" />
+	</ItemGroup>
+
+	<!-- The project lives at the repo root, so keep the test project's sources
+	     out of this compilation. -->
+	<ItemGroup>
+		<Compile Remove="tests/**/*.cs" />
+		<Content Remove="tests/**/*" />
+		<None Remove="tests/**/*" />
 	</ItemGroup>
 
 </Project>

@@ -2,14 +2,22 @@
 
 The [original version](https://github.com/redis-windows/redis-windows) is hard to use if exe, config and data folder are different. This repo to improve it.
 
+The wrapper is a .NET Worker Service using `Microsoft.Extensions.Hosting.WindowsServices`. It launches `redis-server.exe` as a child process, logs to the Windows Event Log, and **stops itself if redis-server exits** so the SCM can apply its recovery policy instead of reporting a healthy service with a dead Redis.
+
+The project multi-targets `net8.0-windows` (LTS) and `net10.0-windows` (LTS).
+
 Build via [dotnet CLI](https://learn.microsoft.com/en-us/dotnet/core/install/windows):
 
 ```ps1
-& dotnet build -c Release -r win-x64 -p Version=1.0.1
-& dotnet publish -c Release -r win-x64 --no-build --sc
+# Build/test the whole solution
+& dotnet build -c Release
+& dotnet test
+
+# Publish a single-file, self-contained, trimmed exe for one framework
+& dotnet publish RedisService.csproj -c Release -r win-x64 -f net10.0-windows -p:Version=1.0.1
 ```
 
-Now `.\bin\Release\net8.0-windows\win-x64\publish\RedisService.exe` is ready to use.
+The published exe lands at `.\bin\Release\<framework>\win-x64\publish\RedisService.exe` (e.g. `net10.0-windows`).
 
 ## Usage
 
@@ -36,7 +44,19 @@ sc.exe create $ServiceName binPath= "$RedisService -e $RedisServer -d $WorkDir -
 sc.exe create $ServiceName binPath= "$RedisService -e $RedisServer -d $WorkDir -- --port 6380"
 ```
 
-Install service (run as Admininstrator):
+Install service (run as Administrator):
+
+The repo ships helper scripts in [`scripts/`](scripts/). Copy the published `RedisService.exe` next to them (or pass `-RedisService`) and run:
+
+```ps1
+# Install and start (see script header for all parameters)
+.\scripts\install-service.ps1 -WorkDir 'C:\var\redis-server' -ConfigFilePath '.\redis.windows.conf'
+
+# Remove
+.\scripts\uninstall-service.ps1 -ServiceName 'Redis'
+```
+
+Or install manually with `sc.exe`:
 
 ```ps1
 $ServiceName = "Redis"
