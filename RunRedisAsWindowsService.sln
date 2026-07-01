@@ -1,0 +1,24 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RedisService", "RedisService.csproj", "{F34CFA5F-9CBD-8592-E493-D5C13CB0EAAE}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{F34CFA5F-9CBD-8592-E493-D5C13CB0EAAE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F34CFA5F-9CBD-8592-E493-D5C13CB0EAAE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F34CFA5F-9CBD-8592-E493-D5C13CB0EAAE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F34CFA5F-9CBD-8592-E493-D5C13CB0EAAE}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {4F489B3F-A122-4A67-8EB6-F0D887B56B91}
+	EndGlobalSection
+EndGlobal
